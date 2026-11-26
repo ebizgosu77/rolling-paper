@@ -33,8 +33,17 @@ button:disabled{opacity:.5;cursor:default}
 .mine .note{position:relative;width:100%;height:100%;font-size:16px}
 .muted{color:var(--sub);font-size:14px}
 .err{color:var(--accent);font-size:14px;margin-top:8px}
+.nl{max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:8px;background:#fff}
+.nl div{display:flex;gap:8px;align-items:center;padding:8px 10px;border-bottom:1px solid var(--line);font-size:14px}
+.nl span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nl button{padding:5px 10px;font-size:13px}
 .foot{text-align:center;margin-top:24px}
 .foot button{background:transparent;color:#9a8a68;border:0;font-weight:400;font-size:12px;padding:4px}
+.hearts{position:fixed;inset:0;overflow:hidden;pointer-events:none;z-index:-1}
+#stage .hearts{position:absolute;z-index:0}
+.heart{position:absolute;top:-8vh;opacity:0;animation:fall linear infinite;will-change:transform}
+@keyframes fall{0%{transform:translate(0,-8vh) rotate(-12deg);opacity:0}10%{opacity:var(--o)}50%{transform:translate(var(--dx),55vh) rotate(12deg)}90%{opacity:var(--o)}100%{transform:translate(calc(var(--dx) * -.5),112vh) rotate(-8deg);opacity:0}}
+@media (prefers-reduced-motion:reduce){.hearts{display:none}}
 #stage{position:fixed;inset:0;background-color:#fff8d6;background-image:repeating-linear-gradient(transparent 0,transparent 31px,#ead98f 31px,#ead98f 32px);background-position:0 12px;display:none;z-index:5;overflow:hidden}
 #stage::before{content:"";position:absolute;top:0;bottom:0;left:28px;width:2px;background:rgba(214,90,90,.4)}
 #stage.on{display:block}
@@ -46,6 +55,7 @@ button:disabled{opacity:.5;cursor:default}
 </style>
 </head>
 <body>
+<div class="hearts" id="h1"></div>
 <div class="wrap" id="app">
   <h1 id="ttl">💌 강사님께 드리는 롤링 페이퍼</h1>
   <p class="sub" id="sub">불러오는 중…</p>
@@ -53,6 +63,7 @@ button:disabled{opacity:.5;cursor:default}
   <div class="foot" id="foot"></div>
 </div>
 <div id="stage">
+  <div class="hearts" id="h2"></div>
   <div id="title2"></div>
   <button id="exit">닫기 (Esc)</button>
   <div id="board"></div>
@@ -62,7 +73,7 @@ button:disabled{opacity:.5;cursor:default}
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import {getAuth,onAuthStateChanged,signInAnonymously,signInWithPopup,GoogleAuthProvider,signOut} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
-import {getFirestore,doc,collection,onSnapshot,setDoc} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+import {getFirestore,doc,collection,onSnapshot,setDoc,deleteDoc} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
 /* ▼▼▼ Firebase 콘솔 > 프로젝트 설정 > 내 앱(웹)에서 복사한 값으로 교체하세요 ▼▼▼ */
 const firebaseConfig={
@@ -121,7 +132,8 @@ function render(){
     h+=`<div class="card"><b>관리자</b><label>페이지 제목</label><input id="tt" maxlength="40" value="${esc(state.cfg.title||"")}" placeholder="${esc(DEFAULT_TITLE)}">
     <div class="row"><button class="ghost" id="saveTt">제목 저장</button></div>
     <label>마감 일시 (선택)</label><input type="datetime-local" id="dl" value="${state.cfg.deadline?toLocal(state.cfg.deadline):""}">
-    <div class="row"><button class="ghost" id="saveDl">마감일 저장</button>${state.cfg.phase==="closed"?`<button class="ghost" id="reopen">다시 열기</button>`:`<button id="closeNow">지금 마감하기</button>`}</div></div>`;
+    <div class="row"><button class="ghost" id="saveDl">마감일 저장</button>${state.cfg.phase==="closed"?`<button class="ghost" id="reopen">다시 열기</button>`:`<button id="closeNow">지금 마감하기</button>`}</div>
+    <label>작성된 메모지 (${state.notes.length}장)</label><div class="nl">${state.notes.map(n=>`<div><span>${esc(n.name)} · ${esc(n.text)}</span><button class="ghost" data-del="${esc(n.id)}">삭제</button></div>`).join("")||`<div><span>아직 없어요</span></div>`}</div></div>`;
   }
   v.innerHTML=h;
   $("#foot").innerHTML=state.admin?`<button id="lo">관리자 로그아웃</button>`:`<button id="li">관리자</button>`;
@@ -134,6 +146,7 @@ function render(){
   on("reopen",()=>saveCfg({phase:"open",deadline:null}));
   on("li",()=>signInWithPopup(auth,new GoogleAuthProvider()).catch(()=>{}));
   on("lo",()=>signOut(auth));
+  v.querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>{if(confirm("이 메모지를 삭제할까요?"))deleteDoc(doc(db,"boards",BOARD,"notes",b.dataset.del)).catch(()=>alert("삭제하지 못했어요. 관리자로 로그인했는지 확인해 주세요."))});
 }
 
 async function submit(){
@@ -144,6 +157,13 @@ async function submit(){
   try{await setDoc(doc(db,"boards",BOARD,"notes",state.user.uid),{name,text,color:state.color,createdAt:mine?.createdAt||Date.now()})}
   catch(e){$("#err").textContent="저장하지 못했어요. 마감되었거나 네트워크 문제일 수 있어요.";$("#send").disabled=false}
 }
+
+/* ---------- 하트 효과 (약하게) ---------- */
+function hearts(el,n){const cs=["#f4a6bb","#f7b8c8","#eb8fa8","#ffc4d1"];
+  for(let i=0;i<n;i++){const s=document.createElement("span");s.className="heart";s.textContent="♥";
+    s.style.cssText=`left:${Math.random()*100}%;font-size:${12+Math.random()*16}px;color:${cs[i%4]};animation-duration:${14+Math.random()*12}s;animation-delay:-${Math.random()*26}s;--o:${.25+Math.random()*.25};--dx:${(Math.random()-.5)*80}px`;
+    el.appendChild(s)}}
+hearts($("#h1"),16);hearts($("#h2"),20);
 
 /* ---------- 발표 화면 ---------- */
 function layout(n){
