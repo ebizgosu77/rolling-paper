@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>강사님께 드리는 롤링 페이퍼</title>
+<style>
+:root{--panel:#fffaf0;--ink:#2b2118;--sub:#6b5a48;--line:#e6d6bd;--accent:#d9534f;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+*{box-sizing:border-box}
+html{background:#fff8d6}
+html,body{margin:0;min-height:100%;color:var(--ink);font-family:"Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif}
+body{background-color:#fff8d6;background-image:repeating-linear-gradient(transparent 0,transparent 31px,#ead98f 31px,#ead98f 32px);background-position:0 12px}
+body::before{content:"";position:fixed;top:0;bottom:0;left:max(10px,calc(50% - 340px));width:2px;background:rgba(214,90,90,.4);z-index:-1;pointer-events:none}
+.wrap{max-width:640px;margin:0 auto;padding:24px 16px 48px}
+h1{font-size:26px;margin:8px 0 4px;text-align:center;color:#3a2f25}
+.sub{text-align:center;color:#7a6a4a;margin:0 0 20px;font-size:15px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:16px;box-shadow:0 4px 14px rgba(0,0,0,.12)}
+label{display:block;font-size:13px;color:var(--sub);margin:12px 0 4px}
+input,textarea{width:100%;font:inherit;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:8px;padding:10px}
+textarea{min-height:130px;resize:vertical}
+button{font:inherit;cursor:pointer;border:0;border-radius:10px;padding:11px 18px;background:var(--accent);color:#fff;font-weight:700}
+button.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+button:disabled{opacity:.5;cursor:default}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:14px}
+.colors{display:flex;gap:8px}
+.sw{width:30px;height:30px;border-radius:50%;border:3px solid transparent;padding:0}
+.sw.on{border-color:var(--ink)}
+.note{position:absolute;padding:10px 12px;border-radius:3px;color:#3a2f25;box-shadow:0 6px 12px rgba(0,0,0,.25);overflow:hidden;display:flex;flex-direction:column;justify-content:space-between;line-height:1.35;word-break:keep-all;overflow-wrap:anywhere}
+.note::before{content:"";position:absolute;top:-4px;left:50%;width:14px;height:14px;margin-left:-7px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#ff8a80,#c62828);box-shadow:0 2px 3px rgba(0,0,0,.4)}
+.note .t{white-space:pre-wrap;overflow:hidden;padding-top:6px}
+.note .n{text-align:right;font-weight:700;opacity:.8;padding-top:4px}
+.mine{position:relative;height:220px;margin:6px 0 0}
+.mine .note{position:relative;width:100%;height:100%;font-size:16px}
+.muted{color:var(--sub);font-size:14px}
+.err{color:var(--accent);font-size:14px;margin-top:8px}
+.foot{text-align:center;margin-top:24px}
+.foot button{background:transparent;color:#9a8a68;border:0;font-weight:400;font-size:12px;padding:4px}
+#stage{position:fixed;inset:0;background-color:#fff8d6;background-image:repeating-linear-gradient(transparent 0,transparent 31px,#ead98f 31px,#ead98f 32px);background-position:0 12px;display:none;z-index:5;overflow:hidden}
+#stage::before{content:"";position:absolute;top:0;bottom:0;left:28px;width:2px;background:rgba(214,90,90,.4)}
+#stage.on{display:block}
+#board{position:absolute;inset:0;padding-top:env(safe-area-inset-top,0px)}
+#hud{position:absolute;left:0;right:0;bottom:calc(10px + env(safe-area-inset-bottom,0px));text-align:center;z-index:9;pointer-events:none}
+#hud span{display:inline-block;background:rgba(0,0,0,.6);color:#fff;padding:7px 16px;border-radius:20px;font-size:14px}
+#exit{position:absolute;top:calc(10px + env(safe-area-inset-top,0px));right:12px;z-index:9;padding:7px 12px;background:rgba(0,0,0,.55);color:#fff;border:0}
+#title2{position:absolute;top:calc(10px + env(safe-area-inset-top,0px));left:0;right:0;text-align:center;font-weight:800;font-size:18px;z-index:8;pointer-events:none;color:#3a2f25}
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+  <h1 id="ttl">💌 강사님께 드리는 롤링 페이퍼</h1>
+  <p class="sub" id="sub">불러오는 중…</p>
+  <div id="view"></div>
+  <div class="foot" id="foot"></div>
+</div>
+<div id="stage">
+  <div id="title2"></div>
+  <button id="exit">닫기 (Esc)</button>
+  <div id="board"></div>
+  <div id="hud"><span id="hudtxt"></span></div>
+</div>
+
+<script type="module">
+import {initializeApp} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+import {getAuth,onAuthStateChanged,signInAnonymously,signInWithPopup,GoogleAuthProvider,signOut} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+import {getFirestore,doc,collection,onSnapshot,setDoc} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+
+/* ▼▼▼ Firebase 콘솔 > 프로젝트 설정 > 내 앱(웹)에서 복사한 값으로 교체하세요 ▼▼▼ */
+const firebaseConfig={
+  apiKey:"AIzaSyCGoUaKVNEZeotNqUucf9Ijml_odFyRvjQ",
+  authDomain:"rolling-paper-90205.firebaseapp.com",
+  projectId:"rolling-paper-90205",
+  appId:"1:130547258951:web:33422d1824a0a675b50362"
+};
+/* ▲▲▲ */
+
+const BOARD=(new URLSearchParams(location.search).get("b")||"main").replace(/[^\w-]/g,"").slice(0,30)||"main";
+const DEFAULT_TITLE="💌 강사님께 드리는 롤링 페이퍼";
+const COLORS=["#fff29a","#ffc9d6","#bfe6ff","#c9f2c7","#e3d1ff"];
+const $=s=>document.querySelector(s);
+const state={user:null,admin:false,notes:[],cfg:{},color:COLORS[0],shown:0,staged:false,notesReady:false};
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+if(firebaseConfig.apiKey.startsWith("YOUR")){$("#sub").textContent="firebaseConfig 값을 먼저 입력해 주세요.";throw new Error("no config")}
+const app=initializeApp(firebaseConfig),auth=getAuth(app),db=getFirestore(app);
+const cfgRef=doc(db,"boards",BOARD,"config","main"),notesCol=collection(db,"boards",BOARD,"notes");
+
+function isClosed(){return state.cfg.phase==="closed"||(state.cfg.deadline&&Date.now()>state.cfg.deadline)}
+function fmt(ms){return new Date(ms).toLocaleString("ko-KR",{month:"long",day:"numeric",hour:"2-digit",minute:"2-digit"})}
+function toLocal(ms){const d=new Date(ms),p=n=>String(n).padStart(2,"0");return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`}
+function noteHTML(n){return `<div class="t">${esc(n.text)}</div><div class="n">— ${esc(n.name)}</div>`}
+const saveCfg=patch=>setDoc(cfgRef,patch,{merge:true});
+
+onAuthStateChanged(auth,u=>{
+  if(!u){signInAnonymously(auth).catch(()=>{$("#sub").textContent="접속에 실패했어요. 새로고침해 주세요."});return}
+  state.user=u;state.admin=!u.isAnonymous;render();
+});
+onSnapshot(notesCol,s=>{state.notes=s.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));state.notesReady=true;render()},()=>{$("#sub").textContent="데이터를 불러오지 못했어요."});
+onSnapshot(cfgRef,s=>{state.cfg=s.exists()?s.data():{};render()});
+
+function render(){
+  if(state.staged||!state.user||!state.notesReady)return;
+  const T=state.cfg.title||DEFAULT_TITLE;
+  $("#ttl").textContent=T;$("#title2").textContent=T;document.title=T;
+  const ae=document.activeElement;
+  if(ae&&/^(INPUT|TEXTAREA)$/.test(ae.tagName)&&$("#view").contains(ae))return;
+  const v=$("#view"),closed=isClosed(),mine=state.notes.find(n=>n.id===state.user.uid);
+  $("#sub").textContent=closed?"작성이 마감되었어요":(state.cfg.deadline?`${fmt(state.cfg.deadline)}까지 작성할 수 있어요`:"강사님께 전하고 싶은 마음을 메모지에 남겨 주세요");
+  let h="";
+  if(!closed){
+    h+=`<div class="card"><label>이름</label><input id="nm" maxlength="12" placeholder="이름을 적어 주세요" value="${esc(mine?.name||"")}">
+    <label>강사님께 한마디 (최대 150자)</label><textarea id="tx" maxlength="150" placeholder="가르쳐 주셔서 감사합니다…">${esc(mine?.text||"")}</textarea>
+    <label>메모지 색</label><div class="colors">${COLORS.map(c=>`<button class="sw ${c===(mine?.color||state.color)?"on":""}" data-c="${c}" style="background:${c}" aria-label="색 선택"></button>`).join("")}</div>
+    <div class="row"><button id="send">${mine?"수정하기":"메모지 붙이기"}</button><span class="muted">지금까지 ${state.notes.length}명이 남겼어요</span></div><div class="err" id="err"></div></div>`;
+    if(mine)h+=`<div class="card"><div class="muted">내 메모지 (발표 때 공개돼요)</div><div class="mine"><div class="note" style="background:${esc(mine.color)}">${noteHTML(mine)}</div></div></div>`;
+  }else{
+    h+=`<div class="card" style="text-align:center"><p style="font-size:18px;margin:6px 0">총 <b>${state.notes.length}장</b>의 메시지가 모였어요 🎉</p>
+    <p class="muted">발표 화면에서 <b>Enter</b>(또는 화면 터치)를 누를 때마다 메모지가 한 장씩 날아와 붙어요.</p>
+    <div class="row" style="justify-content:center"><button id="start" ${state.notes.length?"":"disabled"}>▶ 발표 시작</button></div></div>`;
+  }
+  if(state.admin){
+    h+=`<div class="card"><b>관리자</b><label>페이지 제목</label><input id="tt" maxlength="40" value="${esc(state.cfg.title||"")}" placeholder="${esc(DEFAULT_TITLE)}">
+    <div class="row"><button class="ghost" id="saveTt">제목 저장</button></div>
+    <label>마감 일시 (선택)</label><input type="datetime-local" id="dl" value="${state.cfg.deadline?toLocal(state.cfg.deadline):""}">
+    <div class="row"><button class="ghost" id="saveDl">마감일 저장</button>${state.cfg.phase==="closed"?`<button class="ghost" id="reopen">다시 열기</button>`:`<button id="closeNow">지금 마감하기</button>`}</div></div>`;
+  }
+  v.innerHTML=h;
+  $("#foot").innerHTML=state.admin?`<button id="lo">관리자 로그아웃</button>`:`<button id="li">관리자</button>`;
+  v.querySelectorAll(".sw").forEach(b=>b.onclick=()=>{state.color=b.dataset.c;v.querySelectorAll(".sw").forEach(x=>x.classList.toggle("on",x===b))});
+  const on=(id,f)=>{const e=$("#"+id);if(e)e.onclick=f};
+  on("send",submit);on("start",startStage);
+  on("saveTt",()=>saveCfg({title:$("#tt").value.trim()}));
+  on("saveDl",()=>{const x=$("#dl").value;saveCfg({deadline:x?new Date(x).getTime():null})});
+  on("closeNow",()=>saveCfg({phase:"closed"}));
+  on("reopen",()=>saveCfg({phase:"open",deadline:null}));
+  on("li",()=>signInWithPopup(auth,new GoogleAuthProvider()).catch(()=>{}));
+  on("lo",()=>signOut(auth));
+}
+
+async function submit(){
+  const name=$("#nm").value.trim(),text=$("#tx").value.trim();
+  if(!name||!text){$("#err").textContent="이름과 메시지를 모두 적어 주세요.";return}
+  const mine=state.notes.find(n=>n.id===state.user.uid);
+  $("#send").disabled=true;
+  try{await setDoc(doc(db,"boards",BOARD,"notes",state.user.uid),{name,text,color:state.color,createdAt:mine?.createdAt||Date.now()})}
+  catch(e){$("#err").textContent="저장하지 못했어요. 마감되었거나 네트워크 문제일 수 있어요.";$("#send").disabled=false}
+}
+
+/* ---------- 발표 화면 ---------- */
+function layout(n){
+  const W=innerWidth,H=innerHeight-90,top=50;let best=null;
+  for(let c=1;c<=n;c++){const r=Math.ceil(n/c),w=W/c,h=H/r,s=Math.min(w,h*1.1);if(!best||s>best.s)best={c,r,s,w,h}}
+  const {c,r,w,h}=best,nw=Math.min(w*.9,h*1.15,260),nh=nw*.88;
+  return {c,r,w,h,nw,nh,ox:(W-c*w)/2,oy:top+(H-r*h)/2}
+}
+function place(el,i,L,rot){
+  const col=i%L.c,row=Math.floor(i/L.c);
+  el.style.width=L.nw+"px";el.style.height=L.nh+"px";
+  el.style.left=(L.ox+col*L.w+(L.w-L.nw)/2)+"px";el.style.top=(L.oy+row*L.h+(L.h-L.nh)/2)+"px";
+  el.style.fontSize=Math.max(9,Math.min(19,L.nw/11))*(el.dataset.len>90?.82:1)+"px";
+  el.style.transform=`rotate(${rot}deg)`;
+}
+function buildBoard(animateLast){
+  const b=$("#board"),n=state.notes.length,L=layout(n);b.innerHTML="";
+  for(let i=0;i<state.shown;i++){
+    const nt=state.notes[i],el=document.createElement("div");
+    el.className="note";el.style.background=nt.color;el.innerHTML=noteHTML(nt);el.dataset.len=nt.text.length;
+    const rot=((i*37)%11-5)*.9;place(el,i,L,rot);b.appendChild(el);
+    if(animateLast&&i===state.shown-1){
+      const a=Math.random()*Math.PI*2,d=Math.max(innerWidth,innerHeight)*.9;
+      el.animate([
+        {transform:`translate(${Math.cos(a)*d}px,${Math.sin(a)*d}px) rotate(${rot+(Math.random()*720-360)}deg) scale(2.6)`,opacity:0},
+        {opacity:1,offset:.2},
+        {transform:`translate(0,0) rotate(${rot}deg) scale(1.12)`,offset:.82},
+        {transform:`translate(0,0) rotate(${rot}deg) scale(1)`}
+      ],{duration:1000,easing:"cubic-bezier(.22,.8,.3,1)"});
+    }
+  }
+  $("#hudtxt").textContent=state.shown>=n?`🎉 ${n}장의 마음이 모두 모였어요! (Esc로 닫기)`:`Enter ▶ 다음 메시지 (${state.shown}/${n})`;
+}
+function startStage(){state.staged=true;state.shown=0;$("#stage").classList.add("on");buildBoard(false)}
+function next(){if(state.shown<state.notes.length){state.shown++;buildBoard(true)}}
+function stopStage(){state.staged=false;$("#stage").classList.remove("on");render()}
+addEventListener("keydown",e=>{if(!state.staged)return;if(e.key==="Enter"||e.key===" "||e.key==="ArrowRight"){e.preventDefault();next()}else if(e.key==="Escape")stopStage()});
+$("#stage").addEventListener("click",e=>{if(e.target.id!=="exit")next()});
+$("#exit").onclick=e=>{e.stopPropagation();stopStage()};
+addEventListener("resize",()=>{if(state.staged)buildBoard(false)});
+</script>
+</body>
+</html>
